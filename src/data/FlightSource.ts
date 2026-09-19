@@ -15,6 +15,8 @@ export type Position = {
   lon: number;
   heading: number;   // градусы по часовой от севера
   timestamp: number; // мс
+  speedKmh: number;
+  info?: FlightInfo; // у FR24 light и в тестах может отсутствовать
 };
 
 export type Bounds = { north: number; south: number; west: number; east: number };

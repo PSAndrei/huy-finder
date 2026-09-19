@@ -8,7 +8,7 @@ const proj = makeProjection({ lat: 55, lon: 37 });
 
 describe('geojson', () => {
   it('треки — по LineString на трек, точки как [lon, lat]', () => {
-    const fc = tracksToGeoJson([{ id: 'a', points: [{ lat: 55, lon: 37 }, { lat: 56, lon: 38 }], lastSeen: 0, heading: 0 }]);
+    const fc = tracksToGeoJson([{ id: 'a', points: [{ lat: 55, lon: 37 }, { lat: 56, lon: 38 }], lastSeen: 0, heading: 0, speedKmh: 0, info: null }]);
     expect(fc.features).toHaveLength(1);
     expect(fc.features[0].geometry).toEqual({ type: 'LineString', coordinates: [[37, 55], [38, 56]] });
     expect(fc.features[0].properties).toEqual({ id: 'a' });
@@ -16,8 +16,8 @@ describe('geojson', () => {
 
   it('самолёты — точка в конце трека с курсом', () => {
     const fc = planesToGeoJson([
-      { id: 'a', points: [{ lat: 55, lon: 37 }, { lat: 56, lon: 38 }], lastSeen: 0, heading: 45 },
-      { id: 'b', points: [{ lat: 50, lon: 30 }], lastSeen: 0, heading: 270 },
+      { id: 'a', points: [{ lat: 55, lon: 37 }, { lat: 56, lon: 38 }], lastSeen: 0, heading: 45, speedKmh: 0, info: null },
+      { id: 'b', points: [{ lat: 50, lon: 30 }], lastSeen: 0, heading: 270, speedKmh: 0, info: null },
     ]);
     expect(fc.features).toHaveLength(2);
     expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [38, 56] });

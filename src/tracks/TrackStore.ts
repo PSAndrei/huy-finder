@@ -1,7 +1,14 @@
 import type { LatLon } from '../geometry/project';
-import type { Position } from '../data/FlightSource';
+import type { FlightInfo, Position } from '../data/FlightSource';
 
-export type Track = { id: string; points: LatLon[]; lastSeen: number; heading: number };
+export type Track = {
+  id: string;
+  points: LatLon[];
+  lastSeen: number;
+  heading: number;
+  speedKmh: number;
+  info: FlightInfo | null; // последняя непустая легенда
+};
 
 type Options = { maxAgeMs: number; maxPoints: number };
 
@@ -18,7 +25,7 @@ export class TrackStore {
     for (const p of positions) {
       let t = this.map.get(p.id);
       if (!t) {
-        t = { id: p.id, points: [], lastSeen: now, heading: p.heading };
+        t = { id: p.id, points: [], lastSeen: now, heading: p.heading, speedKmh: p.speedKmh, info: p.info ?? null };
         this.map.set(p.id, t);
       }
       const last = t.points[t.points.length - 1];
@@ -26,6 +33,8 @@ export class TrackStore {
       if (t.points.length > this.opts.maxPoints) t.points.splice(0, t.points.length - this.opts.maxPoints);
       t.lastSeen = now;
       t.heading = p.heading;
+      t.speedKmh = p.speedKmh;
+      if (p.info) t.info = p.info;
     }
     for (const [id, t] of this.map) {
       if (now - t.lastSeen > this.opts.maxAgeMs) this.map.delete(id);

@@ -43,6 +43,7 @@ export class Fr24Source implements FlightSource {
       lon: r.lon,
       heading: r.track,
       timestamp: Date.parse(r.timestamp),
+      speedKmh: 0, // Task 5 заменит на gspeed
     }));
   }
 }

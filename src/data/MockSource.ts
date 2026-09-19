@@ -103,7 +103,7 @@ export class MockSource implements FlightSource {
       next.push(f);
     }
     this.flights = next;
-    return this.flights.map((f) => ({ id: f.id, lat: f.lat, lon: f.lon, heading: f.heading, timestamp: now }));
+    return this.flights.map((f) => ({ id: f.id, lat: f.lat, lon: f.lon, heading: f.heading, timestamp: now, speedKmh: f.speedKmh }));
   }
 
   protected range(min: number, max: number): number {

@@ -24,7 +24,7 @@ describe('Fr24Source', () => {
     expect(headers['Accept-Version']).toBe('v1');
 
     expect(res).toEqual([{
-      id: '333bd698', lat: -19.16625, lon: -175.20432, heading: 204, timestamp: Date.parse('2026-09-19T07:57:02Z'),
+      id: '333bd698', lat: -19.16625, lon: -175.20432, heading: 204, timestamp: Date.parse('2026-09-19T07:57:02Z'), speedKmh: 0,
     }]);
   });
 

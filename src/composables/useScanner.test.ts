@@ -25,7 +25,7 @@ describe('useScanner', () => {
 
   it('tick складывает позиции и считает анализ', async () => {
     const s = setup(stubSource(async () => [
-      { id: 'a', lat: 55, lon: 37, heading: 0, timestamp: 0 },
+      { id: 'a', lat: 55, lon: 37, heading: 0, timestamp: 0, speedKmh: 0 },
     ]));
     await s.tick();
     expect(s.tracks.value).toHaveLength(1);
@@ -76,7 +76,7 @@ describe('useScanner', () => {
   });
 
   it('reset очищает треки и анализ', async () => {
-    const s = setup(stubSource(async () => [{ id: 'a', lat: 55, lon: 37, heading: 0, timestamp: 0 }]));
+    const s = setup(stubSource(async () => [{ id: 'a', lat: 55, lon: 37, heading: 0, timestamp: 0, speedKmh: 0 }]));
     await s.tick();
     s.reset();
     expect(s.tracks.value).toEqual([]);

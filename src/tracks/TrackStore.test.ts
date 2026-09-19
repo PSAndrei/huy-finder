@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TrackStore } from './TrackStore';
 import type { Position } from '../data/FlightSource';
 
-const pos = (id: string, lat: number, lon: number): Position => ({ id, lat, lon, heading: 0, timestamp: 0 });
+const pos = (id: string, lat: number, lon: number): Position => ({ id, lat, lon, heading: 0, timestamp: 0, speedKmh: 0 });
 
 describe('TrackStore', () => {
   it('склеивает позиции одного id в трек по порядку', () => {
@@ -20,6 +20,23 @@ describe('TrackStore', () => {
     s.add([{ ...pos('a', 1, 1), heading: 90 }], 1000);
     s.add([{ ...pos('a', 2, 2), heading: 180 }], 2000);
     expect(s.tracks()[0].heading).toBe(180);
+  });
+
+  it('хранит скорость и последнюю непустую легенду', () => {
+    const s = new TrackStore();
+    const info = { callsign: 'AFL1', airline: 'Aeroflot', aircraft: 'A320', from: { iata: 'SVO', city: 'Moscow' }, to: { iata: 'LED', city: 'Saint Petersburg' } };
+    s.add([{ ...pos('a', 1, 1), speedKmh: 800, info }], 1000);
+    s.add([{ ...pos('a', 2, 2), speedKmh: 850 }], 2000);
+    const t = s.tracks()[0];
+    expect(t.speedKmh).toBe(850);
+    expect(t.info).toEqual(info);
+    expect(s.tracks().find((x) => x.id === 'a')!.info).toEqual(info);
+  });
+
+  it('без легенды info равен null', () => {
+    const s = new TrackStore();
+    s.add([pos('a', 1, 1)], 1000);
+    expect(s.tracks()[0].info).toBeNull();
   });
 
   it('повтор той же точки не добавляется', () => {
