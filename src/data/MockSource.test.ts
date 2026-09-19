@@ -87,4 +87,40 @@ describe('MockSource', () => {
     expect(new Set(b.map((p) => p.id)).size).toBe(10);
     expect(a.map((p) => p.id)).not.toEqual(b.map((p) => p.id));
   });
+
+  it('позиции несут скорость и легенду, легенда постоянна для рейса', async () => {
+    const src = new MockSource(9, 5);
+    const a = await src.fetchPositions(bounds, 0);
+    const b = await src.fetchPositions(bounds, 5000);
+    for (const p of a) {
+      expect(p.speedKmh).toBeGreaterThanOrEqual(700);
+      expect(p.speedKmh).toBeLessThanOrEqual(900);
+      expect(p.info!.callsign).toMatch(/^[A-Z]{3}\d{3,4}$/);
+      expect(b.find((q) => q.id === p.id)?.info).toEqual(p.info);
+    }
+  });
+
+  it('число рейсов зависит от площади: один борт на 600 км², от 30 до 120', async () => {
+    // 200 × 300 км на широте 55° → 60 000 км² → 100 рейсов
+    const mid: Bounds = { north: 55.9, south: 54.1, west: 34.65, east: 39.35 };
+    expect(await new MockSource(1).fetchPositions(mid, 0)).toHaveLength(100);
+    // 111 × 64 км → ~7 000 км² → нижняя граница 30
+    const small: Bounds = { north: 55.5, south: 54.5, west: 36.5, east: 37.5 };
+    expect(await new MockSource(1).fetchPositions(small, 0)).toHaveLength(30);
+    // 2 000 × 1 900 км → верхняя граница 120
+    const huge: Bounds = { north: 64, south: 46, west: 22, east: 52 };
+    expect(await new MockSource(1).fetchPositions(huge, 0)).toHaveLength(120);
+    // явный count — верхняя граница
+    expect(await new MockSource(1, 10).fetchPositions(mid, 0)).toHaveLength(10);
+  });
+
+  it('изменение высоты области вдвое пересоздаёт рейсы', async () => {
+    const src = new MockSource(2, 10);
+    const a = await src.fetchPositions(bounds, 0);
+    const zoomedOut: Bounds = { north: 58, south: 52, west: 30, east: 46 }; // тот же центр, высота ×3
+    const b = await src.fetchPositions(zoomedOut, 5000);
+    expect(a.map((p) => p.id)).not.toEqual(b.map((p) => p.id));
+    const c = await src.fetchPositions(zoomedOut, 10_000);
+    expect(b.map((p) => p.id)).toEqual(c.map((p) => p.id)); // без смены масштаба не пересоздаёт
+  });
 });

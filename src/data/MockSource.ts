@@ -1,7 +1,8 @@
-import type { Bounds, FlightSource, Position } from './FlightSource';
+import type { Bounds, FlightInfo, FlightSource, Position } from './FlightSource';
 import { pointAhead, type LatLon } from '../geometry/project';
 import { mulberry32 } from './random';
 import type { LetterKind } from '../detect/types';
+import { makeFlightInfo } from './legend';
 
 export const KM_PER_DEG = 111.32;
 const DEG = Math.PI / 180;
@@ -18,12 +19,17 @@ const WORD: { kind: LetterKind; dx: number }[] = [
 /** Самый длинный штрих буквы дорисовывается за столько минут при любом масштабе; скорость подсаженных рейсов считается от этого. */
 const PLANT_STROKE_MINUTES = 1.75;
 
+const KM2_PER_FLIGHT = 600;
+const MIN_FLIGHTS = 30;
+const MAX_FLIGHTS = 120;
+
 export type Flight = {
   id: string;
   lat: number;
   lon: number;
   heading: number;             // градусы по часовой от севера
   speedKmh: number;
+  info: FlightInfo;
   remainingKm: number | null;  // null — обычный рейс; число — подсаженный, исчезает, когда долетит
   nextTurnAt: number;          // мс
 };
@@ -60,23 +66,41 @@ function movedFar(prev: Bounds, next: Bounds): boolean {
   return dLat > (prev.north - prev.south) / 2 || dLon > (prev.east - prev.west) / 2;
 }
 
+function areaKm2(b: Bounds): number {
+  const midLat = (b.north + b.south) / 2;
+  return (b.north - b.south) * KM_PER_DEG * (b.east - b.west) * KM_PER_DEG * Math.cos(midLat * DEG);
+}
+
+/** Сколько бортов уместно в области: один на 600 км², но не меньше 30 и не больше 120. */
+function flightsFor(b: Bounds): number {
+  return Math.min(MAX_FLIGHTS, Math.max(MIN_FLIGHTS, Math.round(areaKm2(b) / KM2_PER_FLIGHT)));
+}
+
+function rescaled(prev: Bounds, next: Bounds): boolean {
+  const ratio = (next.north - next.south) / (prev.north - prev.south);
+  return ratio > 2 || ratio < 0.5;
+}
+
 /** Генератор рейсов: случайные самолёты летят по курсу, иногда поворачивают, за границей заменяются. */
 export class MockSource implements FlightSource {
   protected readonly rng: () => number;
+  private readonly legendRng: () => number; // отдельный, чтобы не сдвигать геометрию подсадки
   protected flights: Flight[] = [];
   protected bounds: Bounds | null = null;
   private lastNow: number | null = null;
   protected counter = 0;
 
-  constructor(seed = 1, private readonly count = 60) {
+  constructor(seed = 1, private readonly count = MAX_FLIGHTS) {
     this.rng = mulberry32(seed);
+    this.legendRng = mulberry32(seed + 1);
   }
 
   async fetchPositions(bounds: Bounds, now: number): Promise<Position[]> {
-    if (!this.bounds || movedFar(this.bounds, bounds)) {
+    if (!this.bounds || movedFar(this.bounds, bounds) || rescaled(this.bounds, bounds)) {
       this.bounds = bounds;
       this.flights = this.flights.filter((f) => f.remainingKm !== null);
-      for (let i = 0; i < this.count; i++) this.flights.push(this.randomFlight(bounds, now));
+      const n = Math.min(this.count, flightsFor(bounds));
+      for (let i = 0; i < n; i++) this.flights.push(this.randomFlight(bounds, now));
     }
     const dtH = this.lastNow === null ? 0 : (now - this.lastNow) / 3_600_000;
     this.lastNow = now;
@@ -103,7 +127,7 @@ export class MockSource implements FlightSource {
       next.push(f);
     }
     this.flights = next;
-    return this.flights.map((f) => ({ id: f.id, lat: f.lat, lon: f.lon, heading: f.heading, timestamp: now, speedKmh: f.speedKmh }));
+    return this.flights.map((f) => ({ id: f.id, lat: f.lat, lon: f.lon, heading: f.heading, timestamp: now, speedKmh: f.speedKmh, info: f.info }));
   }
 
   protected range(min: number, max: number): number {
@@ -121,6 +145,7 @@ export class MockSource implements FlightSource {
       lon: this.range(b.west, b.east),
       heading: this.range(0, 360),
       speedKmh: this.range(700, 900),
+      info: makeFlightInfo(this.legendRng),
       remainingKm: null,
       nextTurnAt: now + this.turnDelay(),
     };
@@ -141,6 +166,7 @@ export class MockSource implements FlightSource {
       lon: start.lon,
       heading: bearingDeg(start, target),
       speedKmh: this.range(700, 900),
+      info: makeFlightInfo(this.legendRng),
       remainingKm: null,
       nextTurnAt: now + this.turnDelay(),
     };
@@ -196,6 +222,7 @@ export class MockSource implements FlightSource {
         lon: start.lon,
         heading: (bearingDeg(start, end) + this.range(-2, 2) + 360) % 360,
         speedKmh,
+        info: makeFlightInfo(this.legendRng),
         remainingKm: Math.hypot(ex - sx, ey - sy),
         nextTurnAt: Number.POSITIVE_INFINITY,
       });
