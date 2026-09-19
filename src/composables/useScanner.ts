@@ -27,6 +27,7 @@ export function useScanner(options: Options) {
   let failures = 0;
   let run = 0;
   let inFlight = false;
+  let restartPending = false;
 
   function recompute(bounds: Bounds): void {
     tracks.value = store.tracks();
@@ -73,6 +74,10 @@ export function useScanner(options: Options) {
       }
     } finally {
       inFlight = false;
+      if (restartPending) {
+        restartPending = false;
+        if (status.value === 'running') void tick();
+      }
     }
   }
 
@@ -82,12 +87,14 @@ export function useScanner(options: Options) {
     failures = 0;
     error.value = null;
     run++;
-    void tick();
+    if (inFlight) restartPending = true;
+    else void tick();
   }
 
   function stop(): void {
     status.value = 'idle';
     run++;
+    restartPending = false;
     if (timer) clearTimeout(timer);
     timer = null;
   }

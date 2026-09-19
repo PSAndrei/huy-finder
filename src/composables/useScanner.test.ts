@@ -93,6 +93,7 @@ describe('useScanner', () => {
     await vi.advanceTimersByTimeAsync(2000);
     await s.tick();
     expect(fetch).toHaveBeenCalledTimes(2);
+    expect(s.status.value).toBe('running');
     // Продвигаем на 5000 ms (total 7000) → первый запланированный tick с 5000 ms срабатывает
     await vi.advanceTimersByTimeAsync(5000);
     expect(fetch).toHaveBeenCalledTimes(3);
@@ -102,7 +103,7 @@ describe('useScanner', () => {
     s.stop();
   });
 
-  it('stop/start во время незавершённого запроса не порождает второй цикл', async () => {
+  it('stop/start во время незавершённого запроса восстанавливает опрос', async () => {
     const fetch = vi.fn(async () => {
       return new Promise<Position[]>(resolve => {
         setTimeout(() => resolve([]), 3000);
@@ -116,14 +117,19 @@ describe('useScanner', () => {
     s.stop();
     s.start();
     await vi.advanceTimersByTimeAsync(2000);
-    // первый fetch разрешается после 3000 от начала, но был инвалидирован stop
-    // новых fetch вызовов не будет, т.к. второй tick при inFlight=true вернулся сразу
-    expect(fetch).toHaveBeenCalledTimes(1);
+    // первый fetch разрешается, restart механизм инициирует новый tick
+    expect(fetch).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(3000);
+    // второй fetch разрешается, schedules 5000
+    expect(fetch).toHaveBeenCalledTimes(2);
     await vi.advanceTimersByTimeAsync(5000);
-    // После инвалидации и разрешения первого fetch, цепь не восстановилась
-    expect(fetch).toHaveBeenCalledTimes(1);
+    // третий fetch инициирован
+    expect(fetch).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(8000);
+    // третий fetch разрешен, четвёртый инициирован
+    expect(fetch).toHaveBeenCalledTimes(4);
     s.stop();
     await vi.advanceTimersByTimeAsync(20000);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(4);
   });
 });
