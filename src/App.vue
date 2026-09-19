@@ -11,6 +11,7 @@ import { useScanner } from './composables/useScanner';
 import FlightCard from './ui/FlightCard.vue';
 import { fetchAircraftPhotos, type Photo } from './data/photos';
 import { flightStats } from './detect/flightStats';
+import { filterAnalysis, sameIds, wordTrackIds } from './detect/focus';
 
 const apiKey = (import.meta.env.VITE_FR24_KEY as string | undefined) ?? '';
 const hasKey = apiKey.length > 0;
@@ -68,6 +69,33 @@ function selectWord(w: Word): void {
 const words = computed(() => scanner.analysis.value?.words ?? []);
 const letters = computed(() => scanner.analysis.value?.letters ?? []);
 
+// Режим «только это слово»: на карте остаются борта слова и то, что они нарисовали.
+const focusIds = ref<Set<string> | null>(null);
+const visibleTracks = computed(() => {
+  const ids = focusIds.value;
+  return ids ? scanner.tracks.value.filter((t) => ids.has(t.id)) : scanner.tracks.value;
+});
+const visibleAnalysis = computed(() => {
+  const a = scanner.analysis.value;
+  return a && focusIds.value ? filterAnalysis(a, focusIds.value) : a;
+});
+
+function toggleFocus(w: Word | null): void {
+  if (!w) { focusIds.value = null; return; }
+  const ids = wordTrackIds(w);
+  const same = sameIds(ids, focusIds.value);
+  focusIds.value = same ? null : ids;
+  if (!same) {
+    selectWord(w);
+    if (selectedId.value && !ids.has(selectedId.value)) selectedId.value = null;
+  }
+}
+
+// Все борта слова исчезли — фильтр снимается сам.
+watch(visibleTracks, (t) => {
+  if (focusIds.value && t.length === 0) focusIds.value = null;
+});
+
 // Выбранный самолёт: карточка, фото, статистика.
 const selectedId = ref<string | null>(null);
 const selectedTrack = computed(() => scanner.tracks.value.find((t) => t.id === selectedId.value) ?? null);
@@ -92,8 +120,8 @@ watch(selectedTrack, (t) => {
   <div class="app">
     <MapView
       ref="mapView"
-      :analysis="scanner.analysis.value"
-      :tracks="scanner.tracks.value"
+      :analysis="visibleAnalysis"
+      :tracks="visibleTracks"
       :selected-id="selectedId"
       @bounds="onBounds"
       @select="selectedId = $event"
@@ -112,7 +140,7 @@ watch(selectedTrack, (t) => {
         @stop="scanner.stop"
         @goto-demo="gotoDemo"
       />
-      <Findings :words="words" :letters="letters" @select="selectWord" />
+      <Findings :words="words" :letters="letters" :focus-ids="focusIds" @select="selectWord" @focus="toggleFocus" />
     </aside>
     <FlightCard v-if="selectedTrack" :track="selectedTrack" :photos="photos" :stats="stats" @close="selectedId = null" />
   </div>
