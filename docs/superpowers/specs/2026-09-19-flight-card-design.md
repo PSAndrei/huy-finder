@@ -103,7 +103,8 @@ const AIRPORTS: Airport[] = [
 ## 5. Генератор
 
 - `Flight` получает `info: FlightInfo`, заполняется в `randomFlight`, `edgeFlight` и
-  `plantStrokes` через `makeFlightInfo(this.rng)`.
+  `plantStrokes` через `makeFlightInfo(this.legendRng)`, где `legendRng = mulberry32(seed + 1)` —
+  отдельный генератор, чтобы не сдвигать последовательность геометрии и не ломать подсадку.
 - `fetchPositions` отдаёт `speedKmh: f.speedKmh` и `info: f.info`.
 - Число рейсов при создании: `clamp(round(areaKm2 / 600), 30, 120)`, где
   `areaKm2 = (north − south) × 111.32 × (east − west) × 111.32 × cos(средняя широта)`.
@@ -179,8 +180,8 @@ function flightStats(analysis: Analysis | null, trackId: string): FlightStats;
 ## 11. Тесты (Vitest)
 
 - `legend`: одно зерно — одна легенда; аэропорты вылета и прилёта разные; `airlineName`.
-- `MockSource`: у позиций есть `speedKmh` и `info`; плотность: область 350×230 км даёт около
-  115 рейсов, область 100×60 км даёт 30, область 2000×1500 км даёт 120; изменение высоты вдвое
+- `MockSource`: у позиций есть `speedKmh` и `info`; плотность: область 300×200 км даёт 100
+  рейсов, область 111×64 км даёт 30, область 2000×1900 км даёт 120; явный `count` — верхняя граница; изменение высоты вдвое
   пересоздаёт рейсы.
 - `Fr24Source`: разбор `full` — `speedKmh`, `info`, отсутствие `type`/аэропортов не ломает.
 - `photos`: подменённый `fetch` с двумя страницами → два фото с авторами; ошибка → `[]`;
