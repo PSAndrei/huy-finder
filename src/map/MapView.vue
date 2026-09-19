@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Map as MapLibreMap, NavigationControl, setWorkerUrl, type GeoJSONSource } from 'maplibre-gl';
+import { Map as MapLibreMap, NavigationControl, setWorkerUrl, type GeoJSONSource, type MapMouseEvent } from 'maplibre-gl';
 // Worker MapLibre 6 грузится отдельным модулем; без явного адреса Vite его не отдаёт, тайлы не разбираются и 'load' не приходит.
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -8,34 +8,42 @@ import type { FeatureCollection } from 'geojson';
 import type { Bounds } from '../data/FlightSource';
 import type { Track } from '../tracks/TrackStore';
 import type { Analysis } from '../detect/analyze';
-import { lettersToGeoJson, planesToGeoJson, tracksToGeoJson, wordsToGeoJson } from './geojson';
+import { pointAhead } from '../geometry/project';
+import { lettersToGeoJson, planesToGeoJson, tracksToGeoJson, wordsToGeoJson, type PlaneMarker } from './geojson';
 
-const props = defineProps<{ analysis: Analysis | null; tracks: Track[] }>();
-const emit = defineEmits<{ bounds: [b: Bounds] }>();
+const props = defineProps<{ analysis: Analysis | null; tracks: Track[]; selectedId: string | null }>();
+const emit = defineEmits<{ bounds: [b: Bounds]; select: [id: string | null] }>();
 
 const container = ref<HTMLDivElement | null>(null);
 let map: MapLibreMap | null = null;
 let ready = false;
 let blinkTimer: ReturnType<typeof setInterval> | null = null;
+let planesTimer: ReturnType<typeof setInterval> | null = null;
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 const SOURCES = ['tracks', 'planes', 'letter-strokes', 'letter-labels', 'word-outlines', 'word-labels'] as const;
 // Шрифт, который отдаёт сервер стилей; без него MapLibre рисует каждый глиф локально и сыплет предупреждениями.
 const TEXT_FONT = ['Noto Sans Regular'];
 const PLANE_ICON_PX = 48;
+const PLANE_COLOR = '#ffd600';
+const PLANE_SELECTED_COLOR = '#ff5252';
+const PLANES_TICK_MS = 100;        // как часто сдвигаем иконки между опросами
+const MAX_EXTRAPOLATION_MS = 60_000; // борт без обновлений дальше не летит
+const INITIAL_CENTER: [number, number] = [37.6, 55.7];
+const INITIAL_ZOOM = 8;
 
 const LETTER_COLOR = ['match', ['get', 'kind'], 'X', '#ff5252', 'U', '#ffb300', 'I', '#40c4ff', 'breve', '#40c4ff', '#ffffff'];
 const GRADE_COLOR = ['match', ['get', 'grade'], 'perfect', '#ff1744', 'good', '#ff9100', 'crooked', '#b39ddb', '#9e9e9e'];
 
-/** Силуэт самолёта носом на север, жёлтый как на Flightradar24. Рисуется на canvas, чтобы не грузить файл. */
-function makePlaneIcon(px: number): ImageData {
+/** Силуэт самолёта носом на север. Рисуется на canvas, чтобы не грузить файл. */
+function makePlaneIcon(px: number, fill: string): ImageData {
   const c = document.createElement('canvas');
   c.width = px; c.height = px;
   const g = c.getContext('2d')!;
   g.scale(px / 24, px / 24);
   g.translate(12, 12);
-  g.fillStyle = '#ffd600';
-  g.strokeStyle = '#5d4a00';
+  g.fillStyle = fill;
+  g.strokeStyle = '#3a3000';
   g.lineWidth = 0.8;
   g.beginPath();
   // фюзеляж, крылья, хвост — в координатах 24x24, нос вверх
@@ -59,10 +67,28 @@ function setData(id: (typeof SOURCES)[number], data: FeatureCollection): void {
   src?.setData(data);
 }
 
+/** Иконки между опросами ползут по курсу от последней точки; не дольше MAX_EXTRAPOLATION_MS. */
+function planeMarkers(): PlaneMarker[] {
+  const now = Date.now();
+  return props.tracks
+    .filter((t) => t.points.length >= 1)
+    .map((t) => {
+      const last = t.points[t.points.length - 1];
+      const hours = Math.min(Math.max(now - t.lastSeen, 0), MAX_EXTRAPOLATION_MS) / 3_600_000;
+      const p = pointAhead(last, t.heading, t.speedKmh * hours);
+      return { id: t.id, lat: p.lat, lon: p.lon, heading: t.heading, selected: t.id === props.selectedId };
+    });
+}
+
+function renderPlanes(): void {
+  if (!map || !ready) return;
+  setData('planes', planesToGeoJson(planeMarkers()));
+}
+
 function render(): void {
   if (!map || !ready) return;
   setData('tracks', tracksToGeoJson(props.tracks));
-  setData('planes', planesToGeoJson(props.tracks));
+  renderPlanes();
   const a = props.analysis;
   if (!a) {
     setData('letter-strokes', EMPTY); setData('letter-labels', EMPTY);
@@ -82,10 +108,6 @@ function addLayers(m: MapLibreMap): void {
 
   m.addLayer({ id: 'tracks', type: 'line', source: 'tracks',
     paint: { 'line-color': '#7a7a7a', 'line-width': 1, 'line-opacity': 0.7 } });
-
-  m.addImage('plane', makePlaneIcon(PLANE_ICON_PX), { pixelRatio: 2 });
-  m.addLayer({ id: 'planes', type: 'symbol', source: 'planes',
-    layout: { 'icon-image': 'plane', 'icon-rotate': ['get', 'heading'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
 
   m.addLayer({ id: 'letter-strokes', type: 'line', source: 'letter-strokes',
     paint: { 'line-color': LETTER_COLOR as never, 'line-width': 3 } });
@@ -109,11 +131,32 @@ function addLayers(m: MapLibreMap): void {
     layout: { 'text-field': ['get', 'label'], 'text-font': TEXT_FONT, 'text-size': ['match', ['get', 'grade'], 'perfect', 28, 'good', 22, 16] as never, 'text-allow-overlap': true },
     paint: { 'text-color': GRADE_COLOR as never, 'text-halo-color': '#000000', 'text-halo-width': 2 } });
 
+  // Самолёты — верхний слой, чтобы по ним можно было кликнуть.
+  m.addImage('plane', makePlaneIcon(PLANE_ICON_PX, PLANE_COLOR), { pixelRatio: 2 });
+  m.addImage('plane-selected', makePlaneIcon(PLANE_ICON_PX, PLANE_SELECTED_COLOR), { pixelRatio: 2 });
+  m.addLayer({ id: 'planes', type: 'symbol', source: 'planes',
+    layout: {
+      'icon-image': ['case', ['get', 'selected'], 'plane-selected', 'plane'] as never,
+      'icon-rotate': ['get', 'heading'], 'icon-rotation-alignment': 'map',
+      'icon-allow-overlap': true, 'icon-ignore-placement': true,
+    } });
+
+  m.on('click', 'planes', (e) => {
+    const id = e.features?.[0]?.properties?.id as string | undefined;
+    emit('select', id ?? null);
+  });
+  m.on('click', (e: MapMouseEvent) => {
+    if (m.queryRenderedFeatures(e.point, { layers: ['planes'] }).length === 0) emit('select', null);
+  });
+  m.on('mouseenter', 'planes', () => { m.getCanvas().style.cursor = 'pointer'; });
+  m.on('mouseleave', 'planes', () => { m.getCanvas().style.cursor = ''; });
+
   let on = true;
   blinkTimer = setInterval(() => {
     on = !on;
     m.setPaintProperty('word-outlines-perfect', 'line-opacity', on ? 1 : 0.2);
   }, 500);
+  planesTimer = setInterval(renderPlanes, PLANES_TICK_MS);
 }
 
 onMounted(() => {
@@ -121,8 +164,8 @@ onMounted(() => {
   map = new MapLibreMap({
     container: container.value!,
     style: 'https://tiles.openfreemap.org/styles/liberty',
-    center: [37.6, 55.7],
-    zoom: 6,
+    center: INITIAL_CENTER,
+    zoom: INITIAL_ZOOM,
   });
   map.addControl(new NavigationControl(), 'top-right');
   map.on('load', () => {
@@ -136,11 +179,13 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (blinkTimer) clearInterval(blinkTimer);
+  if (planesTimer) clearInterval(planesTimer);
   map?.remove();
   map = null;
 });
 
 watch(() => [props.analysis, props.tracks], render);
+watch(() => props.selectedId, renderPlanes);
 
 defineExpose({
   flyTo(lon: number, lat: number) {

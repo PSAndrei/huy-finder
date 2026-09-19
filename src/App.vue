@@ -68,7 +68,7 @@ const letters = computed(() => scanner.analysis.value?.letters ?? []);
 
 <template>
   <div class="app">
-    <MapView ref="mapView" :analysis="scanner.analysis.value" :tracks="scanner.tracks.value" @bounds="onBounds" />
+    <MapView ref="mapView" :analysis="scanner.analysis.value" :tracks="scanner.tracks.value" :selected-id="null" @bounds="onBounds" />
     <aside class="panel">
       <Controls
         v-model:mode="mode"

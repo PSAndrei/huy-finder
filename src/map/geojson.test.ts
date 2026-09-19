@@ -14,15 +14,15 @@ describe('geojson', () => {
     expect(fc.features[0].properties).toEqual({ id: 'a' });
   });
 
-  it('самолёты — точка в конце трека с курсом', () => {
+  it('самолёты — точка с курсом и флагом выбора', () => {
     const fc = planesToGeoJson([
-      { id: 'a', points: [{ lat: 55, lon: 37 }, { lat: 56, lon: 38 }], lastSeen: 0, heading: 45, speedKmh: 0, info: null },
-      { id: 'b', points: [{ lat: 50, lon: 30 }], lastSeen: 0, heading: 270, speedKmh: 0, info: null },
+      { id: 'a', lat: 56, lon: 38, heading: 45, selected: true },
+      { id: 'b', lat: 50, lon: 30, heading: 270, selected: false },
     ]);
     expect(fc.features).toHaveLength(2);
     expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [38, 56] });
-    expect(fc.features[0].properties).toEqual({ id: 'a', heading: 45 });
-    expect(fc.features[1].geometry).toEqual({ type: 'Point', coordinates: [30, 50] });
+    expect(fc.features[0].properties).toEqual({ id: 'a', heading: 45, selected: true });
+    expect(fc.features[1].properties).toEqual({ id: 'b', heading: 270, selected: false });
   });
 
   it('буква — отрезки и подпись; у И добавляется дужка', () => {
