@@ -8,6 +8,9 @@ import { Fr24Source } from './data/Fr24Source';
 import type { Bounds, FlightSource } from './data/FlightSource';
 import type { LetterKind, Word } from './detect/types';
 import { useScanner } from './composables/useScanner';
+import FlightCard from './ui/FlightCard.vue';
+import { fetchAircraftPhotos, type Photo } from './data/photos';
+import { flightStats } from './detect/flightStats';
 
 const apiKey = (import.meta.env.VITE_FR24_KEY as string | undefined) ?? '';
 const hasKey = apiKey.length > 0;
@@ -64,11 +67,37 @@ function selectWord(w: Word): void {
 
 const words = computed(() => scanner.analysis.value?.words ?? []);
 const letters = computed(() => scanner.analysis.value?.letters ?? []);
+
+// Выбранный самолёт: карточка, фото, статистика.
+const selectedId = ref<string | null>(null);
+const selectedTrack = computed(() => scanner.tracks.value.find((t) => t.id === selectedId.value) ?? null);
+const photos = ref<Photo[]>([]);
+const stats = computed(() => flightStats(scanner.analysis.value, selectedId.value ?? ''));
+
+watch(selectedId, async (id) => {
+  photos.value = [];
+  const info = id ? scanner.tracks.value.find((t) => t.id === id)?.info : null;
+  if (!info) return;
+  const found = await fetchAircraftPhotos(info);
+  if (selectedId.value === id) photos.value = found;
+});
+
+// Борт исчез из хранилища — карточка закрывается.
+watch(selectedTrack, (t) => {
+  if (!t && selectedId.value !== null) selectedId.value = null;
+});
 </script>
 
 <template>
   <div class="app">
-    <MapView ref="mapView" :analysis="scanner.analysis.value" :tracks="scanner.tracks.value" :selected-id="null" @bounds="onBounds" />
+    <MapView
+      ref="mapView"
+      :analysis="scanner.analysis.value"
+      :tracks="scanner.tracks.value"
+      :selected-id="selectedId"
+      @bounds="onBounds"
+      @select="selectedId = $event"
+    />
     <aside class="panel">
       <Controls
         v-model:mode="mode"
@@ -85,6 +114,7 @@ const letters = computed(() => scanner.analysis.value?.letters ?? []);
       />
       <Findings :words="words" :letters="letters" @select="selectWord" />
     </aside>
+    <FlightCard v-if="selectedTrack" :track="selectedTrack" :photos="photos" :stats="stats" @close="selectedId = null" />
   </div>
 </template>
 
