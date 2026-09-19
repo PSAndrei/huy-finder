@@ -1,3 +1,14 @@
+export type Airport = { iata: string; city: string };
+
+/** Легенда рейса: что показываем в карточке. */
+export type FlightInfo = {
+  callsign: string;   // 'SVR1343'
+  airline: string;    // 'Ural Airlines'
+  aircraft: string;   // 'A321'
+  from: Airport;
+  to: Airport;
+};
+
 export type Position = {
   id: string;
   lat: number;
