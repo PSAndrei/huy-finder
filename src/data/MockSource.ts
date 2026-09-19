@@ -15,7 +15,8 @@ const STROKES: Record<LetterKind, [number, number, number, number][]> = {
 const WORD: { kind: LetterKind; dx: number }[] = [
   { kind: 'X', dx: -1.3 }, { kind: 'U', dx: 0 }, { kind: 'I', dx: 1.3 },
 ];
-const PLANT_SPEED_KMH = 1200;
+/** Самый длинный штрих буквы дорисовывается за столько минут при любом масштабе; скорость подсаженных рейсов считается от этого. */
+const PLANT_STROKE_MINUTES = 1.75;
 
 export type Flight = {
   id: string;
@@ -181,6 +182,8 @@ export class MockSource implements FlightSource {
 
   /** Каждый штрих — рейс, который стартует в начале штриха и исчезает в его конце. */
   private plantStrokes(kind: LetterKind, center: LatLon, sizeKm: number, rotationDeg: number): void {
+    const longestKm = Math.max(...STROKES[kind].map(([x1, y1, x2, y2]) => Math.hypot(x2 - x1, y2 - y1))) * sizeKm;
+    const speedKmh = longestKm / (PLANT_STROKE_MINUTES / 60);
     for (const [x1, y1, x2, y2] of STROKES[kind]) {
       const noise = () => this.range(-0.05, 0.05) * sizeKm;
       const [sx, sy] = rotate(x1 * sizeKm + noise(), y1 * sizeKm + noise(), rotationDeg);
@@ -192,7 +195,7 @@ export class MockSource implements FlightSource {
         lat: start.lat,
         lon: start.lon,
         heading: (bearingDeg(start, end) + this.range(-2, 2) + 360) % 360,
-        speedKmh: PLANT_SPEED_KMH,
+        speedKmh,
         remainingKm: Math.hypot(ex - sx, ey - sy),
         nextTurnAt: Number.POSITIVE_INFINITY,
       });

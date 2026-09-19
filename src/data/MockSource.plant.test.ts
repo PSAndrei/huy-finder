@@ -64,3 +64,28 @@ describe('MockSource.plant', () => {
     expect(await src.fetchPositions(bounds, now + 5000)).toEqual([]);
   });
 });
+
+describe('MockSource.plant — скорость', () => {
+  /** Сколько минут до исчезновения всех подсаженных рейсов. */
+  async function minutesUntilGone(b: Bounds): Promise<number> {
+    const src = new MockSource(8, 0);
+    await src.fetchPositions(b, 0);
+    src.plantLetter('X');
+    let now = 0;
+    for (let i = 0; i < 600; i++) {
+      now += 5000;
+      if ((await src.fetchPositions(b, now)).length === 0) return now / 60_000;
+    }
+    return Infinity;
+  }
+
+  it('самый длинный штрих дорисовывается за 1.5–2 минуты при любой высоте области', async () => {
+    const small: Bounds = { north: 55.5, south: 54.5, west: 36, east: 38 };
+    const large: Bounds = { north: 61, south: 50, west: 22, east: 53 };
+    for (const b of [small, large]) {
+      const m = await minutesUntilGone(b);
+      expect(m, `bounds ${b.north - b.south}°`).toBeGreaterThanOrEqual(1.5);
+      expect(m, `bounds ${b.north - b.south}°`).toBeLessThanOrEqual(2);
+    }
+  });
+});
