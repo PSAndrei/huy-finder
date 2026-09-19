@@ -9,7 +9,7 @@ export class Fr24Error extends Error {
 }
 
 type RawPosition = {
-  fr24_id: string; lat: number; lon: number; track: number; timestamp: string;
+  fr24_id: string; lat: number; lon: number; track?: number | null; timestamp: string;
   gspeed?: number | null;          // узлы
   callsign?: string | null; type?: string | null; painted_as?: string | null;
   orig_iata?: string | null; dest_iata?: string | null;
@@ -50,7 +50,7 @@ export class Fr24Source implements FlightSource {
       id: r.fr24_id,
       lat: r.lat,
       lon: r.lon,
-      heading: r.track,
+      heading: r.track ?? 0,
       timestamp: Date.parse(r.timestamp),
       speedKmh: (r.gspeed ?? 0) * KMH_PER_KNOT,
       info: r.callsign ? {

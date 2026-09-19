@@ -34,12 +34,13 @@ describe('Fr24Source', () => {
   it('без позывного легенды нет; без типа и аэропортов — прочерки', async () => {
     const data = [
       { ...sample.data[0], fr24_id: 'a', callsign: null },
-      { ...sample.data[0], fr24_id: 'b', type: null, painted_as: null, orig_iata: null, dest_iata: null, gspeed: undefined },
+      { ...sample.data[0], fr24_id: 'b', type: null, painted_as: null, orig_iata: null, dest_iata: null, gspeed: undefined, track: null },
     ];
     const fetchFn = vi.fn(async () => new Response(JSON.stringify({ data }), { status: 200 }));
     const res = await new Fr24Source('KEY', fetchFn as unknown as typeof fetch).fetchPositions(bounds, 0);
     expect(res[0].info).toBeUndefined();
     expect(res[1].speedKmh).toBe(0);
+    expect(res[1].heading).toBe(0);
     expect(res[1].info).toEqual({ callsign: 'SVR1343', airline: 'Ural Airlines', aircraft: '—', from: { iata: '—', city: '' }, to: { iata: '—', city: '' } });
   });
 

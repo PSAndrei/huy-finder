@@ -15,7 +15,7 @@ import { flightStats } from './detect/flightStats';
 const apiKey = (import.meta.env.VITE_FR24_KEY as string | undefined) ?? '';
 const hasKey = apiKey.length > 0;
 
-const mock = new MockSource(Date.now() % 100_000, 60);
+const mock = new MockSource(Date.now() % 100_000);
 const api: FlightSource | null = hasKey ? new Fr24Source(apiKey) : null;
 
 const mode = ref<'mock' | 'api'>('mock');

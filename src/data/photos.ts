@@ -3,6 +3,7 @@ import type { FlightInfo } from './FlightSource';
 export type Photo = { url: string; author: string };
 
 type CommonsPage = {
+  index?: number;
   imageinfo?: { thumburl?: string; extmetadata?: { Artist?: { value?: string } } }[];
 };
 
@@ -21,7 +22,8 @@ async function load(query: string, fetchFn: typeof fetch): Promise<Photo[]> {
   if (!res.ok) return [];
   const body = (await res.json()) as { query?: { pages?: Record<string, CommonsPage> } };
   const out: Photo[] = [];
-  for (const page of Object.values(body.query?.pages ?? {})) {
+  const pages = Object.values(body.query?.pages ?? {}).sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  for (const page of pages) {
     const ii = page.imageinfo?.[0];
     if (!ii?.thumburl) continue;
     out.push({ url: ii.thumburl, author: stripTags(ii.extmetadata?.Artist?.value ?? '') });

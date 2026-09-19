@@ -143,7 +143,7 @@ function fetchPhotos(query: string, fetchFn = fetch): Promise<Photo[]>;
 - `MapView` раз в 100 мс (таймер, не rAF: при скрытой вкладке не крутится) пересчитывает точки
   самолётов: `pointAhead(последняя точка, heading, speedKmh × (Date.now() − lastSeen) / 3 600 000)`
   и кладёт в источник `planes`. Прошедшее время ограничено 60 с, чтобы борт без обновлений не
-  улетал бесконечно.
+  улетал бесконечно. Трек без обновлений дольше 60 с иконкой не рисуется (линия трека остаётся).
 - `planesToGeoJson(planes: { id: string; lat: number; lon: number; heading: number; selected: boolean }[])`.
   Треки и детекторы работают по-прежнему по сырым точкам.
 

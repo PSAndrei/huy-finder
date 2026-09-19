@@ -71,7 +71,7 @@ function setData(id: (typeof SOURCES)[number], data: FeatureCollection): void {
 function planeMarkers(): PlaneMarker[] {
   const now = Date.now();
   return props.tracks
-    .filter((t) => t.points.length >= 1)
+    .filter((t) => now - t.lastSeen <= MAX_EXTRAPOLATION_MS)
     .map((t) => {
       const last = t.points[t.points.length - 1];
       const hours = Math.min(Math.max(now - t.lastSeen, 0), MAX_EXTRAPOLATION_MS) / 3_600_000;
@@ -80,8 +80,15 @@ function planeMarkers(): PlaneMarker[] {
     });
 }
 
+let planesEmpty = false;
+
 function renderPlanes(): void {
   if (!map || !ready) return;
+  if (props.tracks.length === 0) {
+    if (!planesEmpty) { setData('planes', EMPTY); planesEmpty = true; }
+    return;
+  }
+  planesEmpty = false;
   setData('planes', planesToGeoJson(planeMarkers()));
 }
 
@@ -167,7 +174,7 @@ onMounted(() => {
     center: INITIAL_CENTER,
     zoom: INITIAL_ZOOM,
   });
-  map.addControl(new NavigationControl(), 'top-right');
+  map.addControl(new NavigationControl(), 'bottom-right');
   map.on('load', () => {
     addLayers(map!);
     ready = true;
