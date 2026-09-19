@@ -27,6 +27,13 @@ export function tracksToGeoJson(tracks: Track[]): FeatureCollection {
     .map((t) => line(t.points.map((p) => [p.lon, p.lat] as [number, number]), { id: t.id })));
 }
 
+/** Самолёты: точка в последней позиции трека, курс — для поворота иконки. */
+export function planesToGeoJson(tracks: Track[]): FeatureCollection {
+  return fc(tracks
+    .filter((t) => t.points.length >= 1)
+    .map((t) => { const p = t.points[t.points.length - 1]; return point([p.lon, p.lat], { id: t.id, heading: t.heading }); }));
+}
+
 export function lettersToGeoJson(letters: Letter[], proj: Projection): { strokes: FeatureCollection; labels: FeatureCollection } {
   const strokes: Feature[] = [];
   const labels: Feature[] = [];

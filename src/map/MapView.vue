@@ -8,7 +8,7 @@ import type { FeatureCollection } from 'geojson';
 import type { Bounds } from '../data/FlightSource';
 import type { Track } from '../tracks/TrackStore';
 import type { Analysis } from '../detect/analyze';
-import { lettersToGeoJson, tracksToGeoJson, wordsToGeoJson } from './geojson';
+import { lettersToGeoJson, planesToGeoJson, tracksToGeoJson, wordsToGeoJson } from './geojson';
 
 const props = defineProps<{ analysis: Analysis | null; tracks: Track[] }>();
 const emit = defineEmits<{ bounds: [b: Bounds] }>();
@@ -19,10 +19,35 @@ let ready = false;
 let blinkTimer: ReturnType<typeof setInterval> | null = null;
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
-const SOURCES = ['tracks', 'letter-strokes', 'letter-labels', 'word-outlines', 'word-labels'] as const;
+const SOURCES = ['tracks', 'planes', 'letter-strokes', 'letter-labels', 'word-outlines', 'word-labels'] as const;
+// Шрифт, который отдаёт сервер стилей; без него MapLibre рисует каждый глиф локально и сыплет предупреждениями.
+const TEXT_FONT = ['Noto Sans Regular'];
+const PLANE_ICON_PX = 48;
 
 const LETTER_COLOR = ['match', ['get', 'kind'], 'X', '#ff5252', 'U', '#ffb300', 'I', '#40c4ff', 'breve', '#40c4ff', '#ffffff'];
 const GRADE_COLOR = ['match', ['get', 'grade'], 'perfect', '#ff1744', 'good', '#ff9100', 'crooked', '#b39ddb', '#9e9e9e'];
+
+/** Силуэт самолёта носом на север, жёлтый как на Flightradar24. Рисуется на canvas, чтобы не грузить файл. */
+function makePlaneIcon(px: number): ImageData {
+  const c = document.createElement('canvas');
+  c.width = px; c.height = px;
+  const g = c.getContext('2d')!;
+  g.scale(px / 24, px / 24);
+  g.translate(12, 12);
+  g.fillStyle = '#ffd600';
+  g.strokeStyle = '#5d4a00';
+  g.lineWidth = 0.8;
+  g.beginPath();
+  // фюзеляж, крылья, хвост — в координатах 24x24, нос вверх
+  g.moveTo(0, -11); g.lineTo(1.6, -8); g.lineTo(1.6, -3);
+  g.lineTo(11, 2); g.lineTo(11, 4); g.lineTo(1.6, 1.5);
+  g.lineTo(1.6, 7); g.lineTo(4.5, 9.5); g.lineTo(4.5, 11); g.lineTo(0, 9.5);
+  g.lineTo(-4.5, 11); g.lineTo(-4.5, 9.5); g.lineTo(-1.6, 7);
+  g.lineTo(-1.6, 1.5); g.lineTo(-11, 4); g.lineTo(-11, 2); g.lineTo(-1.6, -3);
+  g.lineTo(-1.6, -8); g.closePath();
+  g.fill(); g.stroke();
+  return g.getImageData(0, 0, px, px);
+}
 
 function currentBounds(): Bounds {
   const b = map!.getBounds();
@@ -37,6 +62,7 @@ function setData(id: (typeof SOURCES)[number], data: FeatureCollection): void {
 function render(): void {
   if (!map || !ready) return;
   setData('tracks', tracksToGeoJson(props.tracks));
+  setData('planes', planesToGeoJson(props.tracks));
   const a = props.analysis;
   if (!a) {
     setData('letter-strokes', EMPTY); setData('letter-labels', EMPTY);
@@ -57,11 +83,15 @@ function addLayers(m: MapLibreMap): void {
   m.addLayer({ id: 'tracks', type: 'line', source: 'tracks',
     paint: { 'line-color': '#7a7a7a', 'line-width': 1, 'line-opacity': 0.7 } });
 
+  m.addImage('plane', makePlaneIcon(PLANE_ICON_PX), { pixelRatio: 2 });
+  m.addLayer({ id: 'planes', type: 'symbol', source: 'planes',
+    layout: { 'icon-image': 'plane', 'icon-rotate': ['get', 'heading'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
+
   m.addLayer({ id: 'letter-strokes', type: 'line', source: 'letter-strokes',
     paint: { 'line-color': LETTER_COLOR as never, 'line-width': 3 } });
 
   m.addLayer({ id: 'letter-labels', type: 'symbol', source: 'letter-labels',
-    layout: { 'text-field': ['get', 'label'], 'text-size': 12, 'text-offset': [0, -1.2] },
+    layout: { 'text-field': ['get', 'label'], 'text-font': TEXT_FONT, 'text-size': 12, 'text-offset': [0, -1.2] },
     paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 1 } });
 
   // Слова: обычные, анаграммы пунктиром, эталонные мигают.
@@ -76,7 +106,7 @@ function addLayers(m: MapLibreMap): void {
     paint: { 'line-color': '#ff1744', 'line-width': 5 } });
 
   m.addLayer({ id: 'word-labels', type: 'symbol', source: 'word-labels',
-    layout: { 'text-field': ['get', 'label'], 'text-size': ['match', ['get', 'grade'], 'perfect', 28, 'good', 22, 16] as never, 'text-allow-overlap': true },
+    layout: { 'text-field': ['get', 'label'], 'text-font': TEXT_FONT, 'text-size': ['match', ['get', 'grade'], 'perfect', 28, 'good', 22, 16] as never, 'text-allow-overlap': true },
     paint: { 'text-color': GRADE_COLOR as never, 'text-halo-color': '#000000', 'text-halo-width': 2 } });
 
   let on = true;

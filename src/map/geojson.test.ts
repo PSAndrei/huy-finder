@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lettersToGeoJson, tracksToGeoJson, wordsToGeoJson } from './geojson';
+import { lettersToGeoJson, planesToGeoJson, tracksToGeoJson, wordsToGeoJson } from './geojson';
 import { makeProjection } from '../geometry/project';
 import type { Letter, Word } from '../detect/types';
 import { seg } from '../detect/testUtils';
@@ -8,10 +8,21 @@ const proj = makeProjection({ lat: 55, lon: 37 });
 
 describe('geojson', () => {
   it('треки — по LineString на трек, точки как [lon, lat]', () => {
-    const fc = tracksToGeoJson([{ id: 'a', points: [{ lat: 55, lon: 37 }, { lat: 56, lon: 38 }], lastSeen: 0 }]);
+    const fc = tracksToGeoJson([{ id: 'a', points: [{ lat: 55, lon: 37 }, { lat: 56, lon: 38 }], lastSeen: 0, heading: 0 }]);
     expect(fc.features).toHaveLength(1);
     expect(fc.features[0].geometry).toEqual({ type: 'LineString', coordinates: [[37, 55], [38, 56]] });
     expect(fc.features[0].properties).toEqual({ id: 'a' });
+  });
+
+  it('самолёты — точка в конце трека с курсом', () => {
+    const fc = planesToGeoJson([
+      { id: 'a', points: [{ lat: 55, lon: 37 }, { lat: 56, lon: 38 }], lastSeen: 0, heading: 45 },
+      { id: 'b', points: [{ lat: 50, lon: 30 }], lastSeen: 0, heading: 270 },
+    ]);
+    expect(fc.features).toHaveLength(2);
+    expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [38, 56] });
+    expect(fc.features[0].properties).toEqual({ id: 'a', heading: 45 });
+    expect(fc.features[1].geometry).toEqual({ type: 'Point', coordinates: [30, 50] });
   });
 
   it('буква — отрезки и подпись; у И добавляется дужка', () => {

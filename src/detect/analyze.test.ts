@@ -11,7 +11,7 @@ function track(id: string, from: [number, number], to: [number, number], n = 5):
     const t = i / (n - 1);
     points.push({ lat: from[0] + (to[0] - from[0]) * t, lon: from[1] + (to[1] - from[1]) * t });
   }
-  return { id, points, lastSeen: 0 };
+  return { id, points, lastSeen: 0, heading: 0 };
 }
 
 describe('analyze', () => {
@@ -26,7 +26,7 @@ describe('analyze', () => {
   });
 
   it('треки из одной точки пропускаются', () => {
-    const res = analyze([{ id: 'a', points: [{ lat: 55, lon: 37 }], lastSeen: 0 }], bounds);
+    const res = analyze([{ id: 'a', points: [{ lat: 55, lon: 37 }], lastSeen: 0, heading: 0 }], bounds);
     expect(res.segmentCount).toBe(0);
   });
 });

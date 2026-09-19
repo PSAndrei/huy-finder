@@ -15,6 +15,13 @@ describe('TrackStore', () => {
     expect(s.tracks()).toHaveLength(2);
   });
 
+  it('запоминает курс последней позиции', () => {
+    const s = new TrackStore();
+    s.add([{ ...pos('a', 1, 1), heading: 90 }], 1000);
+    s.add([{ ...pos('a', 2, 2), heading: 180 }], 2000);
+    expect(s.tracks()[0].heading).toBe(180);
+  });
+
   it('повтор той же точки не добавляется', () => {
     const s = new TrackStore();
     s.add([pos('a', 1, 1)], 1000);
