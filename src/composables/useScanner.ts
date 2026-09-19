@@ -25,6 +25,8 @@ export function useScanner(options: Options) {
   const status = ref<ScannerStatus>('idle');
   let timer: ReturnType<typeof setTimeout> | null = null;
   let failures = 0;
+  let run = 0;
+  let inFlight = false;
 
   function recompute(bounds: Bounds): void {
     tracks.value = store.tracks();
@@ -33,34 +35,44 @@ export function useScanner(options: Options) {
 
   function schedule(ms: number): void {
     if (status.value !== 'running') return;
+    if (timer) clearTimeout(timer);
     timer = setTimeout(() => void tick(), ms);
   }
 
   async function tick(): Promise<void> {
-    const bounds = options.getBounds();
-    if (!bounds) {
-      schedule(options.intervalMs.value);
-      return;
-    }
-    const now = Date.now();
+    if (inFlight) return;
+    inFlight = true;
+    const myRun = run;
     try {
-      const positions = await options.source.value.fetchPositions(bounds, now);
-      store.add(positions, now);
-      failures = 0;
-      error.value = null;
-      recompute(bounds);
-      schedule(options.intervalMs.value);
-    } catch (e) {
-      if (e instanceof Fr24Error && FATAL_STATUSES.has(e.status)) {
-        status.value = 'stopped-error';
-        error.value = `${e.status}: ${e.message}`;
+      const bounds = options.getBounds();
+      if (!bounds) {
+        schedule(options.intervalMs.value);
         return;
       }
-      failures++;
-      error.value = e instanceof Error ? e.message : String(e);
-      const base = options.intervalMs.value;
-      const delay = failures >= 3 ? Math.min(base * 2 ** (failures - 2), MAX_BACKOFF_MS) : base;
-      schedule(delay);
+      const now = Date.now();
+      try {
+        const positions = await options.source.value.fetchPositions(bounds, now);
+        if (myRun !== run) return;
+        store.add(positions, now);
+        failures = 0;
+        error.value = null;
+        recompute(bounds);
+        schedule(options.intervalMs.value);
+      } catch (e) {
+        if (myRun !== run) return;
+        if (e instanceof Fr24Error && FATAL_STATUSES.has(e.status)) {
+          status.value = 'stopped-error';
+          error.value = `${e.status}: ${e.message}`;
+          return;
+        }
+        failures++;
+        error.value = e instanceof Error ? e.message : String(e);
+        const base = options.intervalMs.value;
+        const delay = failures >= 3 ? Math.min(base * 2 ** (failures - 2), MAX_BACKOFF_MS) : base;
+        schedule(delay);
+      }
+    } finally {
+      inFlight = false;
     }
   }
 
@@ -69,11 +81,13 @@ export function useScanner(options: Options) {
     status.value = 'running';
     failures = 0;
     error.value = null;
+    run++;
     void tick();
   }
 
   function stop(): void {
     status.value = 'idle';
+    run++;
     if (timer) clearTimeout(timer);
     timer = null;
   }
