@@ -12,12 +12,16 @@ import FlightCard from './ui/FlightCard.vue';
 import { fetchAircraftPhotos, type Photo } from './data/photos';
 import { flightStats } from './detect/flightStats';
 import { filterAnalysis, sameIds, wordTrackIds } from './detect/focus';
-
-const apiKey = (import.meta.env.VITE_FR24_KEY as string | undefined) ?? '';
-const hasKey = apiKey.length > 0;
+import { loadKey, saveKey, verifyKey, type KeyStatus } from './data/fr24Key';
 
 const mock = new MockSource(Date.now() % 100_000);
-const api: FlightSource | null = hasKey ? new Fr24Source(apiKey) : null;
+
+// Ключ FR24: из localStorage, иначе из переменной окружения. Источник API появляется только после проверки.
+const apiKey = ref(loadKey() || ((import.meta.env.VITE_FR24_KEY as string | undefined) ?? ''));
+const keyStatus = ref<KeyStatus>('none');
+const keyMessage = ref<string | null>(null);
+const api = computed<FlightSource | null>(() => (keyStatus.value === 'ok' && apiKey.value ? new Fr24Source(apiKey.value) : null));
+const hasKey = computed(() => api.value !== null);
 
 const mode = ref<'mock' | 'api'>('mock');
 const intervalMs = ref(5000);
@@ -25,7 +29,40 @@ const sensitivity = ref(0);
 const bounds = ref<Bounds | null>(null);
 const mapView = ref<InstanceType<typeof MapView> | null>(null);
 
-const source = computed<FlightSource>(() => (mode.value === 'api' && api ? api : mock));
+const source = computed<FlightSource>(() => (mode.value === 'api' && api.value ? api.value : mock));
+
+async function applyKey(key: string): Promise<void> {
+  keyStatus.value = 'checking';
+  keyMessage.value = null;
+  const result = await verifyKey(key);
+  if (result === 'ok') {
+    apiKey.value = key;
+    saveKey(key);
+    keyStatus.value = 'ok';
+    mode.value = 'api';
+    return;
+  }
+  mode.value = 'mock';
+  if (result === 'invalid') {
+    apiKey.value = '';
+    saveKey(null);
+    keyStatus.value = 'invalid';
+    keyMessage.value = 'Ключ не принят Flightradar24. Работаем на демо.';
+  } else {
+    keyStatus.value = 'error';
+    keyMessage.value = 'Не удалось проверить ключ: нет связи с Flightradar24. Работаем на демо.';
+  }
+}
+
+function removeKey(): void {
+  apiKey.value = '';
+  saveKey(null);
+  keyStatus.value = 'none';
+  keyMessage.value = null;
+  mode.value = 'mock';
+}
+
+if (apiKey.value) void applyKey(apiKey.value);
 
 const scanner = useScanner({
   source,
@@ -132,8 +169,13 @@ watch(selectedTrack, (t) => {
         v-model:interval-ms="intervalMs"
         v-model:sensitivity="sensitivity"
         :has-key="hasKey"
+        :key-status="keyStatus"
+        :key-message="keyMessage"
+        :key-tail="apiKey.slice(-4)"
         :status="scanner.status.value"
         :error="scanner.error.value"
+        @save-key="applyKey"
+        @remove-key="removeKey"
         @plant-letter="plantLetter"
         @plant-word="plantWord"
         @start="scanner.start"
