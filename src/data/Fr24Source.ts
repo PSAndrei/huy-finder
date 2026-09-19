@@ -1,4 +1,5 @@
 import type { Bounds, FlightSource, Position } from './FlightSource';
+import { airlineName } from './legend';
 
 export class Fr24Error extends Error {
   constructor(public readonly status: number, message: string) {
@@ -7,7 +8,15 @@ export class Fr24Error extends Error {
   }
 }
 
-type RawPosition = { fr24_id: string; lat: number; lon: number; track: number; timestamp: string };
+type RawPosition = {
+  fr24_id: string; lat: number; lon: number; track: number; timestamp: string;
+  gspeed?: number | null;          // узлы
+  callsign?: string | null; type?: string | null; painted_as?: string | null;
+  orig_iata?: string | null; dest_iata?: string | null;
+};
+
+const KMH_PER_KNOT = 1.852;
+const NONE = '—';
 
 /** Адаптер Flightradar24 API. Один запрос позиций в прямоугольнике. Не проверен на боевом ключе. */
 export class Fr24Source implements FlightSource {
@@ -18,7 +27,7 @@ export class Fr24Source implements FlightSource {
   ) {}
 
   async fetchPositions(bounds: Bounds, _now: number): Promise<Position[]> {
-    const url = `${this.baseUrl}live/flight-positions/light?bounds=${bounds.north},${bounds.south},${bounds.west},${bounds.east}`;
+    const url = `${this.baseUrl}live/flight-positions/full?bounds=${bounds.north},${bounds.south},${bounds.west},${bounds.east}`;
     const res = await this.fetchFn(url, {
       headers: {
         Accept: 'application/json',
@@ -43,7 +52,14 @@ export class Fr24Source implements FlightSource {
       lon: r.lon,
       heading: r.track,
       timestamp: Date.parse(r.timestamp),
-      speedKmh: 0, // Task 5 заменит на gspeed
+      speedKmh: (r.gspeed ?? 0) * KMH_PER_KNOT,
+      info: r.callsign ? {
+        callsign: r.callsign,
+        airline: airlineName(r.painted_as ?? r.callsign.slice(0, 3)),
+        aircraft: r.type ?? NONE,
+        from: { iata: r.orig_iata ?? NONE, city: '' },
+        to: { iata: r.dest_iata ?? NONE, city: '' },
+      } : undefined,
     }));
   }
 }
