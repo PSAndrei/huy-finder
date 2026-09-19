@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Map as MapLibreMap, NavigationControl, type GeoJSONSource } from 'maplibre-gl';
+import { Map as MapLibreMap, NavigationControl, setWorkerUrl, type GeoJSONSource } from 'maplibre-gl';
+// Worker MapLibre 6 грузится отдельным модулем; без явного адреса Vite его не отдаёт, тайлы не разбираются и 'load' не приходит.
+import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { FeatureCollection } from 'geojson';
 import type { Bounds } from '../data/FlightSource';
@@ -85,6 +87,7 @@ function addLayers(m: MapLibreMap): void {
 }
 
 onMounted(() => {
+  setWorkerUrl(mapWorkerUrl);
   map = new MapLibreMap({
     container: container.value!,
     style: 'https://tiles.openfreemap.org/styles/liberty',
