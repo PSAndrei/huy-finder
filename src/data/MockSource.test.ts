@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MockSource } from './MockSource';
+import { MockSource, SPEED_MAX, SPEED_MIN } from './MockSource';
 import { mulberry32 } from './random';
 import type { Bounds } from './FlightSource';
 
@@ -46,7 +46,7 @@ describe('MockSource', () => {
     expect(await a.fetchPositions(bounds, 5000)).toEqual(await b.fetchPositions(bounds, 5000));
   });
 
-  it('за минуту рейс пролетает 11–15 км по своему курсу', async () => {
+  it('за минуту рейс пролетает 17–23 км по своему курсу', async () => {
     const src = new MockSource(11, 30);
     const before = await src.fetchPositions(bounds, 0);
     const after = await src.fetchPositions(bounds, 60_000);
@@ -56,8 +56,8 @@ describe('MockSource', () => {
       const a = byId.get(b.id);
       if (!a) continue; // вылетел за границы и заменён
       const d = distKm(b, a);
-      expect(d).toBeGreaterThan(11);
-      expect(d).toBeLessThan(15.5);
+      expect(d).toBeGreaterThan(17);
+      expect(d).toBeLessThan(23);
       checked++;
     }
     expect(checked).toBeGreaterThan(20);
@@ -93,8 +93,8 @@ describe('MockSource', () => {
     const a = await src.fetchPositions(bounds, 0);
     const b = await src.fetchPositions(bounds, 5000);
     for (const p of a) {
-      expect(p.speedKmh).toBeGreaterThanOrEqual(700);
-      expect(p.speedKmh).toBeLessThanOrEqual(900);
+      expect(p.speedKmh).toBeGreaterThanOrEqual(SPEED_MIN);
+      expect(p.speedKmh).toBeLessThanOrEqual(SPEED_MAX);
       expect(p.info!.callsign).toMatch(/^[A-Z]{3}\d{3,4}$/);
       expect(b.find((q) => q.id === p.id)?.info).toEqual(p.info);
     }

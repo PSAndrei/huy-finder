@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { Track } from '../tracks/TrackStore';
 import type { Photo } from '../data/photos';
 import type { FlightStats } from '../detect/flightStats';
 import { GRADE_LABEL, LETTER_CHAR } from '../detect/types';
+import { aviasalesUrl } from '../data/aviasales';
 
 const props = defineProps<{ track: Track; photos: Photo[]; stats: FlightStats }>();
 const emit = defineEmits<{ close: [] }>();
 
 const NONE = '—';
+const bookUrl = computed(() => aviasalesUrl(props.track.info, new Date()));
 </script>
 
 <template>
@@ -52,6 +55,8 @@ const NONE = '—';
       </ul>
       <p v-else class="none">Ничего не нарисовал</p>
     </div>
+
+    <a class="book" :href="bookUrl" target="_blank" rel="noopener">Забронировать рейс</a>
   </section>
 </template>
 
@@ -84,4 +89,9 @@ ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: col
 .good { color: #ff9100; }
 .crooked { color: #b39ddb; }
 .anagram { color: #9e9e9e; }
+.book {
+  display: block; margin: 0 12px 12px; padding: 10px; text-align: center; border-radius: 6px;
+  background: #ffd600; color: #111; font-weight: bold; text-decoration: none;
+}
+.book:hover { background: #ffe54c; }
 </style>
