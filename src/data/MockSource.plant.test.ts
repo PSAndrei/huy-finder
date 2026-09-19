@@ -79,13 +79,13 @@ describe('MockSource.plant — скорость', () => {
     return Infinity;
   }
 
-  it('самый длинный штрих дорисовывается за 1.5–2 минуты при любой высоте области', async () => {
+  it('самый длинный штрих дорисовывается за 1–1.35 минуты при любой высоте области', async () => {
     const small: Bounds = { north: 55.5, south: 54.5, west: 36, east: 38 };
     const large: Bounds = { north: 61, south: 50, west: 22, east: 53 };
     for (const b of [small, large]) {
       const m = await minutesUntilGone(b);
-      expect(m, `bounds ${b.north - b.south}°`).toBeGreaterThanOrEqual(1.5);
-      expect(m, `bounds ${b.north - b.south}°`).toBeLessThanOrEqual(2);
+      expect(m, `bounds ${b.north - b.south}°`).toBeGreaterThanOrEqual(1);
+      expect(m, `bounds ${b.north - b.south}°`).toBeLessThanOrEqual(1.35);
     }
   });
 });

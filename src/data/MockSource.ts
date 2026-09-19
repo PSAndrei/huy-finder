@@ -17,7 +17,11 @@ const WORD: { kind: LetterKind; dx: number }[] = [
   { kind: 'X', dx: -1.3 }, { kind: 'U', dx: 0 }, { kind: 'I', dx: 1.3 },
 ];
 /** Самый длинный штрих буквы дорисовывается за столько минут при любом масштабе; скорость подсаженных рейсов считается от этого. */
-const PLANT_STROKE_MINUTES = 1.75;
+const PLANT_STROKE_MINUTES = 1.17;
+
+/** Для презентации в полтора раза быстрее реальных 700–900 км/ч. */
+export const SPEED_MIN = 1050;
+export const SPEED_MAX = 1350;
 
 const KM2_PER_FLIGHT = 600;
 const MIN_FLIGHTS = 30;
@@ -144,7 +148,7 @@ export class MockSource implements FlightSource {
       lat: this.range(b.south, b.north),
       lon: this.range(b.west, b.east),
       heading: this.range(0, 360),
-      speedKmh: this.range(700, 900),
+      speedKmh: this.range(SPEED_MIN, SPEED_MAX),
       info: makeFlightInfo(this.legendRng),
       remainingKm: null,
       nextTurnAt: now + this.turnDelay(),
@@ -165,7 +169,7 @@ export class MockSource implements FlightSource {
       lat: start.lat,
       lon: start.lon,
       heading: bearingDeg(start, target),
-      speedKmh: this.range(700, 900),
+      speedKmh: this.range(SPEED_MIN, SPEED_MAX),
       info: makeFlightInfo(this.legendRng),
       remainingKm: null,
       nextTurnAt: now + this.turnDelay(),
