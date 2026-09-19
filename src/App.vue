@@ -12,6 +12,7 @@ import FlightCard from './ui/FlightCard.vue';
 import { fetchAircraftPhotos, type Photo } from './data/photos';
 import { flightStats } from './detect/flightStats';
 import { filterAnalysis, sameIds, wordTrackIds } from './detect/focus';
+import { limitAnalysis } from './detect/limit';
 import { loadKey, saveKey, verifyKey, type KeyStatus } from './data/fr24Key';
 
 const mock = new MockSource(Date.now() % 100_000);
@@ -103,7 +104,6 @@ function selectWord(w: Word): void {
   mapView.value?.flyTo(ll.lon, ll.lat);
 }
 
-const words = computed(() => scanner.analysis.value?.words ?? []);
 const letters = computed(() => scanner.analysis.value?.letters ?? []);
 
 // Режим «только это слово»: на карте остаются борта слова и то, что они нарисовали.
@@ -112,10 +112,16 @@ const visibleTracks = computed(() => {
   const ids = focusIds.value;
   return ids ? scanner.tracks.value.filter((t) => ids.has(t.id)) : scanner.tracks.value;
 });
-const visibleAnalysis = computed(() => {
+const focusedAnalysis = computed(() => {
   const a = scanner.analysis.value;
   return a && focusIds.value ? filterAnalysis(a, focusIds.value) : a;
 });
+
+// На карте и в списке не больше wordLimit лучших слов, чтобы не засорять карту. null — все.
+const wordLimit = ref<number | null>(20);
+const visibleAnalysis = computed(() => (focusedAnalysis.value ? limitAnalysis(focusedAnalysis.value, wordLimit.value) : null));
+const words = computed(() => visibleAnalysis.value?.words ?? []);
+const totalWords = computed(() => focusedAnalysis.value?.words.length ?? 0);
 
 function toggleFocus(w: Word | null): void {
   if (!w) { focusIds.value = null; return; }
@@ -182,7 +188,15 @@ watch(selectedTrack, (t) => {
         @stop="scanner.stop"
         @goto-demo="gotoDemo"
       />
-      <Findings :words="words" :letters="letters" :focus-ids="focusIds" @select="selectWord" @focus="toggleFocus" />
+      <Findings
+        v-model:limit="wordLimit"
+        :words="words"
+        :total-words="totalWords"
+        :letters="letters"
+        :focus-ids="focusIds"
+        @select="selectWord"
+        @focus="toggleFocus"
+      />
     </aside>
     <FlightCard v-if="selectedTrack" :track="selectedTrack" :photos="photos" :stats="stats" @close="selectedId = null" />
   </div>

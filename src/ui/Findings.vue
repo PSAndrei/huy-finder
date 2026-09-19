@@ -3,8 +3,13 @@ import { computed } from 'vue';
 import { GRADE_LABEL, LETTER_CHAR, type Letter, type LetterKind, type Word } from '../detect/types';
 import { sameIds, wordTrackIds } from '../detect/focus';
 
-const props = defineProps<{ words: Word[]; letters: Letter[]; focusIds: Set<string> | null }>();
+const props = defineProps<{ words: Word[]; totalWords: number; letters: Letter[]; focusIds: Set<string> | null }>();
 const emit = defineEmits<{ select: [word: Word]; focus: [word: Word | null] }>();
+const limit = defineModel<number | null>('limit', { required: true });
+
+const LIMITS: { value: number | null; label: string }[] = [
+  { value: 10, label: '10' }, { value: 20, label: '20' }, { value: 50, label: '50' }, { value: null, label: 'все' },
+];
 
 const best = computed(() => props.words[0] ?? null);
 
@@ -21,7 +26,16 @@ const counts = computed(() => {
 
 <template>
   <section class="findings">
-    <h2>Находки</h2>
+    <header class="head">
+      <h2>Находки</h2>
+      <label class="limit">
+        показывать
+        <select v-model="limit">
+          <option v-for="o in LIMITS" :key="o.label" :value="o.value">{{ o.label }}</option>
+        </select>
+      </label>
+    </header>
+    <p v-if="totalWords > words.length" class="meta">Показано {{ words.length }} из {{ totalWords }} слов</p>
 
     <button v-if="focusIds" class="show-all" @click="emit('focus', null)">Показать все</button>
 
@@ -52,6 +66,10 @@ const counts = computed(() => {
 
 <style scoped>
 .findings { display: flex; flex-direction: column; gap: 8px; }
+.head { display: flex; justify-content: space-between; align-items: baseline; }
+.head h2 { margin: 0; }
+.limit { font-size: 13px; color: #bbb; display: flex; gap: 6px; align-items: center; }
+.limit select { background: #222; color: #eee; border: 1px solid #555; border-radius: 4px; padding: 2px 4px; }
 .best { cursor: pointer; padding: 8px; border: 1px solid #444; border-radius: 6px; }
 .best .text { font-size: 28px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; }
 .list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
