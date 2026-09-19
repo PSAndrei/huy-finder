@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeProjection } from './project';
+import { makeProjection, pointAhead } from './project';
 
 describe('makeProjection', () => {
   const proj = makeProjection({ lat: 55, lon: 37 });
@@ -26,5 +26,23 @@ describe('makeProjection', () => {
     const back = proj.toLatLon(proj.toXY(src));
     expect(back.lat).toBeCloseTo(src.lat, 9);
     expect(back.lon).toBeCloseTo(src.lon, 9);
+  });
+});
+
+describe('pointAhead', () => {
+  it('111.32 км на север — плюс градус широты', () => {
+    const p = pointAhead({ lat: 55, lon: 37 }, 0, 111.32);
+    expect(p.lat).toBeCloseTo(56, 6);
+    expect(p.lon).toBeCloseTo(37, 6);
+  });
+
+  it('на восток на экваторе — плюс градус долготы', () => {
+    const p = pointAhead({ lat: 0, lon: 10 }, 90, 111.32);
+    expect(p.lat).toBeCloseTo(0, 6);
+    expect(p.lon).toBeCloseTo(11, 6);
+  });
+
+  it('ноль километров — та же точка', () => {
+    expect(pointAhead({ lat: 55, lon: 37 }, 123, 0)).toEqual({ lat: 55, lon: 37 });
   });
 });

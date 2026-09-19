@@ -1,5 +1,5 @@
 import type { Bounds, FlightSource, Position } from './FlightSource';
-import type { LatLon } from '../geometry/project';
+import { pointAhead, type LatLon } from '../geometry/project';
 import { mulberry32 } from './random';
 import type { LetterKind } from '../detect/types';
 
@@ -30,9 +30,9 @@ export type Flight = {
 
 /** Сдвинуть точку на km по курсу heading. */
 export function moveKm(f: LatLon & { heading: number }, km: number): void {
-  const h = f.heading * DEG;
-  f.lat += (km * Math.cos(h)) / KM_PER_DEG;
-  f.lon += (km * Math.sin(h)) / (KM_PER_DEG * Math.cos(f.lat * DEG));
+  const q = pointAhead(f, f.heading, km);
+  f.lat = q.lat;
+  f.lon = q.lon;
 }
 
 /** Курс из точки a в точку b, градусы по часовой от севера. */

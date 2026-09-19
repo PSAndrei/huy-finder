@@ -29,3 +29,13 @@ export function makeProjection(center: LatLon): Projection {
     },
   };
 }
+
+const KM_PER_DEG = 111.32;
+
+/** Точка в km по курсу headingDeg (по часовой от севера). Долгота масштабируется по новой широте. */
+export function pointAhead(p: LatLon, headingDeg: number, km: number): LatLon {
+  const h = headingDeg * DEG;
+  const lat = p.lat + (km * Math.cos(h)) / KM_PER_DEG;
+  const lon = p.lon + (km * Math.sin(h)) / (KM_PER_DEG * Math.cos(lat * DEG));
+  return { lat, lon };
+}
