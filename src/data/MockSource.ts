@@ -1,9 +1,21 @@
 import type { Bounds, FlightSource, Position } from './FlightSource';
 import type { LatLon } from '../geometry/project';
 import { mulberry32 } from './random';
+import type { LetterKind } from '../detect/types';
 
 export const KM_PER_DEG = 111.32;
 const DEG = Math.PI / 180;
+
+/** Штрихи букв в долях размера L: [x1, y1, x2, y2], x — вправо, y — вверх. */
+const STROKES: Record<LetterKind, [number, number, number, number][]> = {
+  X: [[-0.5, -0.5, 0.5, 0.5], [-0.5, 0.5, 0.5, -0.5]],
+  U: [[-0.233, -0.5, 0.233, 0.5], [-0.233, 0.5, 0, 0]],
+  I: [[-0.4, -0.5, -0.4, 0.5], [0.4, -0.5, 0.4, 0.5], [-0.4, -0.5, 0.4, 0.5]],
+};
+const WORD: { kind: LetterKind; dx: number }[] = [
+  { kind: 'X', dx: -1.3 }, { kind: 'U', dx: 0 }, { kind: 'I', dx: 1.3 },
+];
+const PLANT_SPEED_KMH = 1200;
 
 export type Flight = {
   id: string;
@@ -132,4 +144,64 @@ export class MockSource implements FlightSource {
       nextTurnAt: now + this.turnDelay(),
     };
   }
+
+  /** Подсадить букву в случайное место области. */
+  plantLetter(kind: LetterKind): boolean {
+    if (!this.bounds) return false;
+    const b = this.bounds;
+    const sizeKm = this.letterSizeKm(b);
+    const center = {
+      lat: this.range(b.south + 0.25 * (b.north - b.south), b.north - 0.25 * (b.north - b.south)),
+      lon: this.range(b.west + 0.25 * (b.east - b.west), b.east - 0.25 * (b.east - b.west)),
+    };
+    this.plantStrokes(kind, center, sizeKm, this.range(-40, 40));
+    return true;
+  }
+
+  /** Подсадить слово ХУЙ с общим наклоном. */
+  plantWord(): boolean {
+    if (!this.bounds) return false;
+    const b = this.bounds;
+    const sizeKm = this.letterSizeKm(b);
+    const rotation = this.range(-40, 40);
+    const center = {
+      lat: this.range(b.south + 0.3 * (b.north - b.south), b.north - 0.3 * (b.north - b.south)),
+      lon: this.range(b.west + 0.3 * (b.east - b.west), b.east - 0.3 * (b.east - b.west)),
+    };
+    for (const { kind, dx } of WORD) {
+      const [ox, oy] = rotate(dx * sizeKm, 0, rotation);
+      this.plantStrokes(kind, localToLatLon(center, ox, oy), sizeKm, rotation);
+    }
+    return true;
+  }
+
+  private letterSizeKm(b: Bounds): number {
+    return 0.12 * (b.north - b.south) * KM_PER_DEG;
+  }
+
+  /** Каждый штрих — рейс, который стартует в начале штриха и исчезает в его конце. */
+  private plantStrokes(kind: LetterKind, center: LatLon, sizeKm: number, rotationDeg: number): void {
+    for (const [x1, y1, x2, y2] of STROKES[kind]) {
+      const noise = () => this.range(-0.05, 0.05) * sizeKm;
+      const [sx, sy] = rotate(x1 * sizeKm + noise(), y1 * sizeKm + noise(), rotationDeg);
+      const [ex, ey] = rotate(x2 * sizeKm, y2 * sizeKm, rotationDeg);
+      const start = localToLatLon(center, sx, sy);
+      const end = localToLatLon(center, ex, ey);
+      this.flights.push({
+        id: `plant-${this.counter++}`,
+        lat: start.lat,
+        lon: start.lon,
+        heading: (bearingDeg(start, end) + this.range(-2, 2) + 360) % 360,
+        speedKmh: PLANT_SPEED_KMH,
+        remainingKm: Math.hypot(ex - sx, ey - sy),
+        nextTurnAt: Number.POSITIVE_INFINITY,
+      });
+    }
+  }
+}
+
+/** Поворот вектора (x, y) против часовой стрелки на deg градусов. */
+function rotate(x: number, y: number, deg: number): [number, number] {
+  const r = deg * DEG;
+  return [x * Math.cos(r) - y * Math.sin(r), x * Math.sin(r) + y * Math.cos(r)];
 }
