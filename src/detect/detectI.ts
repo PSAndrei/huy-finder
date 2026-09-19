@@ -1,5 +1,5 @@
 import type { Pt } from '../geometry/project';
-import { direction, distance, dot, length, lineAngle, midpoint, projectPoint, type Segment } from '../geometry/segments';
+import { direction, distance, dot, length, lineAngle, midpoint, neg, projectPoint, type Segment } from '../geometry/segments';
 import { DEFAULT_OPTIONS, clamp01, letterKey, minScore, tolerance, type DetectOptions, type Letter } from './types';
 
 /** Наименьшее из двух назначений концов диагонали на точки p и q. */
@@ -37,8 +37,10 @@ export function detectI(segments: Segment[], opts: DetectOptions = DEFAULT_OPTIO
       const gap = pr.dist / avg;
       if (gap < gapMin || gap > gapMax) continue;
 
-      // Берём up вдоль первого штриха. right — перпендикуляр по часовой стрелке.
-      const up = direction(s1);
+      // Берём up вдоль первого штриха, нормализуя направление, чтобы дужка была сверху
+      // независимо от направления полёта. right — перпендикуляр по часовой стрелке.
+      let up = direction(s1);
+      if (up.y < 0 || (up.y === 0 && up.x < 0)) up = neg(up);
       const right = { x: up.y, y: -up.x };
       const s1IsLeft = dot(midpoint(s1), right) < dot(midpoint(s2), right);
       const left = s1IsLeft ? s1 : s2;

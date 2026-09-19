@@ -82,6 +82,18 @@ describe('detectWord', () => {
     expect(res).toEqual([]);
   });
 
+  it('две Х рядом не переворачивают up И дважды', () => {
+    const i = letter('I', 1.3, 0, { x: 0, y: -1 });
+    const res = detectWord([
+      letter('X', -1.3, 0, null),
+      letter('X', -1.2, 0.1, null, 60),
+      letter('U', 0, 0, { x: 0, y: 1 }),
+      i,
+    ]);
+    expect(res).toHaveLength(2);
+    expect(i.up!.y).toBeCloseTo(1);
+  });
+
   it('слабые буквы и кривой ряд дают слово ниже 40 — не показываем', () => {
     const res = detectWord([
       letter('X', -1.3, 0.45, null, 10),

@@ -36,7 +36,8 @@ export function detectWord(letters: Letter[], opts: DetectOptions = DEFAULT_OPTI
     for (const i of is) {
       // И симметрична: подходит и up, и -up
       const flipped = angleDeg(up, neg(i.up!)) < angleDeg(up, i.up!);
-      const upAngle = angleDeg(up, flipped ? neg(i.up!) : i.up!);
+      const iUp = flipped ? neg(i.up!) : i.up!;
+      const upAngle = angleDeg(up, iUp);
       if (upAngle > maxUpAngle) continue;
       for (const x of xs) {
         const trio = [x, u, i];
@@ -72,7 +73,7 @@ export function detectWord(letters: Letter[], opts: DetectOptions = DEFAULT_OPTI
         if (seen.has(key)) continue;
         seen.add(key);
 
-        if (flipped) i.up = neg(i.up!);
+        i.up = iUp;
         out.push({
           letters: ordered, text, correctOrder, score, grade: gradeOf(score, correctOrder),
           center: { x: mean(trio.map((l) => l.center.x)), y: mean(trio.map((l) => l.center.y)) },

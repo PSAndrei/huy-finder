@@ -39,4 +39,12 @@ describe('detectI', () => {
   it('диагональ того же трека, что штрих — не И', () => {
     expect(detectI([seg(-0.4, -0.5, -0.4, 0.5, 'same'), R(), seg(-0.4, -0.5, 0.4, 0.5, 'same')])).toEqual([]);
   });
+
+  it('И, пройденная с севера на юг, всё равно даёт дужку сверху', () => {
+    const l = seg(-0.4, 0.5, -0.4, -0.5);
+    const r = seg(0.4, 0.5, 0.4, -0.5);
+    const res = detectI([l, r, seg(-0.4, -0.5, 0.4, 0.5)]);
+    expect(res).toHaveLength(1);
+    expect(res[0].up!.y).toBeGreaterThan(0);
+  });
 });

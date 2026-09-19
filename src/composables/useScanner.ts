@@ -64,6 +64,7 @@ export function useScanner(options: Options) {
         if (e instanceof Fr24Error && FATAL_STATUSES.has(e.status)) {
           status.value = 'stopped-error';
           error.value = `${e.status}: ${e.message}`;
+          if (timer) { clearTimeout(timer); timer = null; }
           return;
         }
         failures++;
